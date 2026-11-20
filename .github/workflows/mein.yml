@@ -1,0 +1,37 @@
+name: Build RT5370
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          sudo apt-get update && sudo apt-get install -y bc bison build-essential ccache curl flex git libssl-dev libelf-dev python3 unzip wget zstd
+          mkdir -p ~/work/clang && cd ~/work
+          git clone --depth=1 https://googlesource.com -b android15-6.6 kernel
+          wget -qO- https://googlesource.com | tar -xz -C clang
+          cd kernel
+          cp $GITHUB_WORKSPACE/defconfig.txt .config
+          ./scripts/config --set-str LOCALVERSION "-android15-8-ge56cf6b09cca-ab1551674-4k"
+          ./scripts/config --disable LOCALVERSION_AUTO
+          ./scripts/config --disable MODVERSIONS
+          ./scripts/config -m CFG80211 -m MAC80211 -m RT2X00 -m RT2X00_LIB -m RT2X00_LIB_USB -m RT2800_LIB -m RT2800USB -e RT2800USB_RT53XX
+          export PATH="$HOME/work/clang/bin:$PATH"
+          make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig modules_prepare
+          make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 M=net/wireless
+          make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 M=net/mac80211
+          make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 M=drivers/net/wireless/ralink/rt2x00
+          mkdir -p ~/mod/modules ~/mod/system/vendor/firmware ~/mod/META-INF/com/google/android
+          find . -name "*.ko" -exec cp {} ~/mod/modules/ \;
+          wget -qO ~/mod/system/vendor/firmware/rt2870.bin https://kernel.org
+          printf "id=rt5370\nname=RT5370 WiFi\nversion=1.0\nversionCode=1\nauthor=GKI\ndescription=RT5370 driver\n" > ~/mod/module.prop
+          printf "#!/system/bin/sh\nMODDIR=\${0%%/*}\nfor m in cfg80211 mac80211 rt2x00lib rt2x00usb rt2800lib rt2800usb; do insmod \$MODDIR/modules/\$m.ko; done\n" > ~/mod/post-fs-data.sh
+          chmod 755 ~/mod/post-fs-data.sh
+          wget -qO ~/mod/META-INF/com/google/android/update-binary https://githubusercontent.com
+          echo "#MAGISK" > ~/mod/META-INF/com/google/android/updater-script
+          cd ~/mod && zip -r $GITHUB_WORKSPACE/RT5370-KSU.zip .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RT5370-KSU
+          path: RT5370-KSU.zip
+          
