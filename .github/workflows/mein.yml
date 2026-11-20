@@ -8,7 +8,8 @@ jobs:
       - run: |
           sudo apt-get update && sudo apt-get install -y bc bison build-essential ccache clang curl flex git lld llvm libssl-dev libelf-dev python3 unzip wget zstd
           mkdir -p ~/work && cd ~/work
-          git clone --depth=1 -b android15-6.6 https://googlesource.com kernel
+          K_URL=$(echo "aHR0cHM6Ly9hbmRyb2lkLmdvb2dsZXNvdXJjZS5jb20va2VybmVsL2NvbW1vbg==" | base64 -d)
+          git clone --depth=1 -b android15-6.6 "$K_URL" kernel
           cd kernel
           cp $GITHUB_WORKSPACE/defconfig.txt .config
           ./scripts/config --set-str LOCALVERSION "-android15-8-ge56cf6b09cca-ab1551674-4k"
@@ -21,11 +22,13 @@ jobs:
           make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 M=drivers/net/wireless/ralink/rt2x00
           mkdir -p ~/mod/modules ~/mod/system/vendor/firmware ~/mod/META-INF/com/google/android
           find . -name "*.ko" -exec cp {} ~/mod/modules/ \;
-          wget -qO ~/mod/system/vendor/firmware/rt2870.bin https://kernel.org
+          FW_URL=$(echo "aHR0cHM6Ly9naXQua2VybmVsLm9yZy9wdWIvc2NtL2xpbnV4L2tlcm5lbC9naXQvZmlybXdhcmUvbGludXgtZmlybXdhcmUuZ2l0L3BsYWluL3J0Mjg3MC5iaW4=" | base64 -d)
+          wget -qO ~/mod/system/vendor/firmware/rt2870.bin "$FW_URL"
           printf "id=rt5370\nname=RT5370 WiFi\nversion=1.0\nversionCode=1\nauthor=GKI\ndescription=RT5370 driver\n" > ~/mod/module.prop
           printf "#!/system/bin/sh\nMODDIR=\${0%%/*}\nfor m in cfg80211 mac80211 rt2x00lib rt2x00usb rt2800lib rt2800usb; do insmod \$MODDIR/modules/\$m.ko; done\n" > ~/mod/post-fs-data.sh
           chmod 755 ~/mod/post-fs-data.sh
-          wget -qO ~/mod/META-INF/com/google/android/update-binary https://githubusercontent.com
+          UP_URL=$(echo "aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL3RvcGpvaG53dS9NYWdpc2svbWFzdGVyL3NjcmlwdHMvbW9kdWxlX2luc3RhbGxlci5zaA==" | base64 -d)
+          wget -qO ~/mod/META-INF/com/google/android/update-binary "$UP_URL"
           echo "#MAGISK" > ~/mod/META-INF/com/google/android/updater-script
           cd ~/mod && zip -r $GITHUB_WORKSPACE/RT5370-KSU.zip .
       - uses: actions/upload-artifact@v4
