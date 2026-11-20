@@ -16,7 +16,8 @@ jobs:
           ./scripts/config --disable LOCALVERSION_AUTO
           ./scripts/config --disable MODVERSIONS
           ./scripts/config -m CFG80211 -m MAC80211 -m RT2X00 -m RT2X00_LIB -m RT2X00_LIB_USB -m RT2800_LIB -m RT2800USB -e RT2800USB_RT53XX
-          make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig modules_prepare
+          make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig
+          make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 vmlinux modules_prepare
           make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 M=net/wireless
           make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 M=net/mac80211
           make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 M=drivers/net/wireless/ralink/rt2x00
@@ -35,3 +36,4 @@ jobs:
         with:
           name: RT5370-KSU
           path: RT5370-KSU.zip
+          
