@@ -1,0 +1,86 @@
+name: Build RT5370 GKI Modules
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison build-essential ccache curl flex git libssl-dev libelf-dev python3 unzip wget zstd
+
+      - name: Download Prebuilt Clang & Android 15 6.6 Kernel Source
+        run: |
+          mkdir -p ~/work && cd ~/work
+          git clone --depth=1 https://googlesource.com -b android15-6.6 kernel
+          mkdir -p clang && cd clang
+          wget -q https://googlesource.com
+          tar -xzf clang-r510928.tar.gz
+
+      - name: Configure and Build Modules
+        run: |
+          cd ~/work/kernel
+          cp $GITHUB_WORKSPACE/defconfig.txt .config
+          ./scripts/config --set-str LOCALVERSION "-android15-8-ge56cf6b09cca-ab1551674-4k"
+          ./scripts/config --disable LOCALVERSION_AUTO
+          ./scripts/config --disable MODVERSIONS
+          ./scripts/config -m CFG80211
+          ./scripts/config -m MAC80211
+          ./scripts/config -m RT2X00
+          ./scripts/config -m RT2X00_LIB
+          ./scripts/config -m RT2X00_LIB_USB
+          ./scripts/config -m RT2800_LIB
+          ./scripts/config -m RT2800USB
+          ./scripts/config -e RT2800USB_RT53XX
+          
+          export PATH="$HOME/work/clang/bin:$PATH"
+          make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig
+          make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 modules_prepare
+          make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 M=net/wireless
+          make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 M=net/mac80211
+          make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 M=drivers/net/wireless/ralink/rt2x00
+
+      - name: Package KernelSU Module
+        run: |
+          mkdir -p ~/ksu_mod/modules ~/ksu_mod/system/vendor/firmware ~/ksu_mod/META-INF/com/google/android
+          find ~/work/kernel -name "*.ko" -exec cp {} ~/ksu_mod/modules/ \;
+          wget -q -O ~/ksu_mod/system/vendor/firmware/rt2870.bin https://kernel.org
+          
+          cat << 'EOF' > ~/ksu_mod/module.prop
+          id=rt5370_wifi
+          name=Ralink RT5370 USB Wi-Fi Driver
+          version=v1.0
+          versionCode=1
+          author=CustomGKI
+          description=Adds rt2800usb driver and firmware for GKI 6.6.118
+          EOF
+
+          cat << 'EOF' > ~/ksu_mod/post-fs-data.sh
+          #!/system/bin/sh
+          MODDIR=${0%/*}
+          insmod $MODDIR/modules/cfg80211.ko
+          insmod $MODDIR/modules/mac80211.ko
+          insmod $MODDIR/modules/rt2x00lib.ko
+          insmod $MODDIR/modules/rt2x00usb.ko
+          insmod $MODDIR/modules/rt2800lib.ko
+          insmod $MODDIR/modules/rt2800usb.ko
+          EOF
+          chmod 755 ~/ksu_mod/post-fs-data.sh
+
+          wget -q -O ~/ksu_mod/META-INF/com/google/android/update-binary https://githubusercontent.com
+          echo "#MAGISK" > ~/ksu_mod/META-INF/com/google/android/updater-script
+
+          cd ~/ksu_mod && zip -r $GITHUB_WORKSPACE/RT5370-KSU-Module.zip .
+
+      - name: Upload KSU Module
+        uses: actions/upload-artifact@v4
+        with:
+          name: RT5370-KSU-Module
+          path: RT5370-KSU-Module.zip
+          
