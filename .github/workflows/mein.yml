@@ -9,11 +9,9 @@ jobs:
           sudo apt-get update && sudo apt-get install -y bc bison build-essential ccache clang curl flex git lld llvm libssl-dev libelf-dev python3 unzip wget zstd
           mkdir -p ~/work && cd ~/work
           K_URL=$(echo "aHR0cHM6Ly9hbmRyb2lkLmdvb2dsZXNvdXJjZS5jb20va2VybmVsL2NvbW1vbg==" | base64 -d)
-          git init kernel && cd kernel
-          git remote add origin "$K_URL"
-          git fetch --depth=1 origin e56cf6b09cca || git fetch --depth=1 origin android15-6.6
-          git checkout FETCH_HEAD
-          sed -i 's/^SUBLEVEL = .*/SUBLEVEL = 118/' Makefile
+          git clone --depth=1 -b android15-6.6-2026-05 "$K_URL" kernel || git clone --depth=1 -b android15-6.6-2026-04 "$K_URL" kernel
+          cd kernel
+          head -n 5 Makefile
           cp $GITHUB_WORKSPACE/defconfig.txt .config
           ./scripts/config --set-str LOCALVERSION "-android15-8-ge56cf6b09cca-ab1551674-4k"
           ./scripts/config --disable LOCALVERSION_AUTO
@@ -29,7 +27,7 @@ jobs:
           find drivers/net/wireless/ralink/rt2x00 -name "*.ko" -exec cp {} ~/mod/modules/ \;
           FW_URL=$(echo "aHR0cHM6Ly9naXQua2VybmVsLm9yZy9wdWIvc2NtL2xpbnV4L2tlcm5lbC9naXQvZmlybXdhcmUvbGludXgtZmlybXdhcmUuZ2l0L3BsYWluL3J0Mjg3MC5iaW4=" | base64 -d)
           wget -qO ~/mod/system/vendor/firmware/rt2870.bin "$FW_URL"
-          printf "id=rt5370\nname=RT5370 WiFi Safe\nversion=2.4\nversionCode=15\nauthor=GKI\ndescription=Exact commit e56cf6b09cca RT5370 clean\n" > ~/mod/module.prop
+          printf "id=rt5370\nname=RT5370 WiFi Safe\nversion=2.5\nversionCode=16\nauthor=GKI\ndescription=Exact branch android15-6.6-2026-05 RT5370\n" > ~/mod/module.prop
           UP_URL=$(echo "aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL3RvcGpvaG53dS9NYWdpc2svbWFzdGVyL3NjcmlwdHMvbW9kdWxlX2luc3RhbGxlci5zaA==" | base64 -d)
           wget -qO ~/mod/META-INF/com/google/android/update-binary "$UP_URL"
           echo "#MAGISK" > ~/mod/META-INF/com/google/android/updater-script
