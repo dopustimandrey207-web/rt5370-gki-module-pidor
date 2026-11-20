@@ -15,12 +15,13 @@ jobs:
           cp $GITHUB_WORKSPACE/defconfig.txt .config
           ./scripts/config --set-str LOCALVERSION "-android15-8-ge56cf6b09cca-ab1551674-4k"
           ./scripts/config --disable LOCALVERSION_AUTO
-          ./scripts/config -e NETDEVICES -e WLAN -e WLAN_VENDOR_RALINK
+          ./scripts/config -e NETDEVICES -e WLAN -e WLAN_VENDOR_RALINK -e USB_SUPPORT -e USB -e NEW_LEDS -e LEDS_CLASS -e CRC_CCITT
           ./scripts/config -m CFG80211 -m MAC80211 -m RT2X00 -m RT2X00_LIB -m RT2X00_LIB_USB -m RT2800_LIB -m RT2800USB -e RT2800USB_RT53XX
-          make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig modules_prepare
+          make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig
+          grep -E "RT2X00|RT2800" .config
+          make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 modules_prepare
           SYM_URL=$(echo "aHR0cHM6Ly9jaS5hbmRyb2lkLmNvbS9idWlsZHMvc3VibWl0dGVkLzE1NTExNjc0L2tlcm5lbF9hYXJjaDY0L2xhdGVzdC9yYXcvTW9kdWxlLnN5bXZlcnM=" | base64 -d)
           wget -qO Module.symvers "$SYM_URL" || touch Module.symvers
-          ls -lh Module.symvers
           make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 KBUILD_MODPOST_WARN=1 M=net/wireless
           make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 KBUILD_MODPOST_WARN=1 M=net/mac80211
           make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 KBUILD_MODPOST_WARN=1 M=drivers/net/wireless/ralink/rt2x00
@@ -29,9 +30,9 @@ jobs:
           ls -lh ~/mod/modules/
           FW_URL=$(echo "aHR0cHM6Ly9naXQua2VybmVsLm9yZy9wdWIvc2NtL2xpbnV4L2tlcm5lbC9naXQvZmlybXdhcmUvbGludXgtZmlybXdhcmUuZ2l0L3BsYWluL3J0Mjg3MC5iaW4=" | base64 -d)
           wget -qO ~/mod/system/vendor/firmware/rt2870.bin "$FW_URL"
-          printf "id=rt5370\nname=RT5370 WiFi\nversion=1.3\nversionCode=4\nauthor=GKI\ndescription=RT5370 driver\n" > ~/mod/module.prop
-          printf "#!/system/bin/sh\nMODDIR=\${0%%/*}\nfor m in cfg80211 mac80211 rt2x00lib rt2x00usb rt2800lib rt2800usb; do insmod \$MODDIR/modules/\$m.ko; done\n" > ~/mod/post-fs-data.sh
-          chmod 755 ~/mod/post-fs-data.sh
+          printf "id=rt5370\nname=RT5370 WiFi\nversion=1.4\nversionCode=5\nauthor=GKI\ndescription=RT5370 driver\n" > ~/mod/module.prop
+          printf "#!/system/bin/sh\nMODDIR=\${0%%/*}\nfor m in cfg80211 mac80211 rt2x00lib rt2x00usb rt2800lib rt2800usb; do insmod \$MODDIR/modules/\$m.ko; done\n" > ~/mod/service.sh
+          chmod 755 ~/mod/service.sh
           UP_URL=$(echo "aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL3RvcGpvaG53dS9NYWdpc2svbWFzdGVyL3NjcmlwdHMvbW9kdWxlX2luc3RhbGxlci5zaA==" | base64 -d)
           wget -qO ~/mod/META-INF/com/google/android/update-binary "$UP_URL"
           echo "#MAGISK" > ~/mod/META-INF/com/google/android/updater-script
