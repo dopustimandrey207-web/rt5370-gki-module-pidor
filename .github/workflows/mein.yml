@@ -18,7 +18,6 @@ jobs:
           sudo ln -sf /usr/bin/llvm-objcopy-18 /usr/local/bin/llvm-objcopy
           sudo ln -sf /usr/bin/llvm-objdump-18 /usr/local/bin/llvm-objdump
           sudo ln -sf /usr/bin/llvm-readelf-18 /usr/local/bin/llvm-readelf
-          clang --version
           mkdir -p ~/work && cd ~/work
           K_URL=$(echo "aHR0cHM6Ly9hbmRyb2lkLmdvb2dsZXNvdXJjZS5jb20va2VybmVsL2NvbW1vbg==" | base64 -d)
           git clone --depth=1 -b android15-6.6-2026-04 "$K_URL" kernel
@@ -26,6 +25,7 @@ jobs:
           cp $GITHUB_WORKSPACE/defconfig.txt .config
           ./scripts/config --set-str LOCALVERSION "-android15-8-ge56cf6b09cca-ab1551674-4k"
           ./scripts/config --disable LOCALVERSION_AUTO
+          ./scripts/config --disable CFI_CLANG
           ./scripts/config -e NETDEVICES -e WLAN -e WLAN_VENDOR_RALINK -e USB_SUPPORT -e USB -e CRC_CCITT -e CRYPTO_ARC4 -e CRYPTO_LIB_ARC4
           ./scripts/config -m CFG80211 -m MAC80211 -m RT2X00 -m RT2X00_LIB -m RT2X00_LIB_USB -m RT2800_LIB -m RT2800USB -e RT2800USB_RT53XX
           sed -i 's/led_classdev_suspend(/\/\/led_classdev_suspend(/g' drivers/net/wireless/ralink/rt2x00/*.c
@@ -38,7 +38,7 @@ jobs:
           find drivers/net/wireless/ralink/rt2x00 -name "*.ko" -exec cp {} ~/mod/modules/ \;
           FW_URL=$(echo "aHR0cHM6Ly9naXQua2VybmVsLm9yZy9wdWIvc2NtL2xpbnV4L2tlcm5lbC9naXQvZmlybXdhcmUvbGludXgtZmlybXdhcmUuZ2l0L3BsYWluL3J0Mjg3MC5iaW4=" | base64 -d)
           wget -qO ~/mod/system/vendor/firmware/rt2870.bin "$FW_URL"
-          printf "id=rt5370\nname=RT5370 WiFi Safe\nversion=2.6\nversionCode=17\nauthor=GKI\ndescription=LLVM 18 + branch 2026-04 RT5370\n" > ~/mod/module.prop
+          printf "id=rt5370\nname=RT5370 WiFi Safe\nversion=2.7\nversionCode=18\nauthor=GKI\ndescription=No-CFI LLVM 18 RT5370\n" > ~/mod/module.prop
           UP_URL=$(echo "aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL3RvcGpvaG53dS9NYWdpc2svbWFzdGVyL3NjcmlwdHMvbW9kdWxlX2luc3RhbGxlci5zaA==" | base64 -d)
           wget -qO ~/mod/META-INF/com/google/android/update-binary "$UP_URL"
           echo "#MAGISK" > ~/mod/META-INF/com/google/android/updater-script
