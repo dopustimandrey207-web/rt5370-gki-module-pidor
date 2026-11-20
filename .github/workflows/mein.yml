@@ -42,11 +42,8 @@ jobs:
 
           ./scripts/config --disable LOCALVERSION_AUTO
           ./scripts/config --set-str LOCALVERSION "-android15-8-ge56cf6b09cca-ab1551674-4k"
-
-          # Сохраняем CFI совместимым с ядром
           ./scripts/config -e CFI_CLANG
 
-          # Базовые подсистемы, USB, LED и криптография
           ./scripts/config \
             -e NETDEVICES \
             -e WLAN \
@@ -59,7 +56,6 @@ jobs:
             -e CRYPTO_ARC4 \
             -e CRYPTO_LIB_ARC4
 
-          # cfg80211 и mac80211 берутся из /vendor_dlkm/lib/modules; модулями собираем rt2x00 / rt2800usb
           ./scripts/config \
             -m RT2X00 \
             -m RT2X00_LIB \
@@ -82,28 +78,4 @@ jobs:
 
           find drivers/net/wireless/ralink/rt2x00 -name "*.ko" -exec cp -v {} "$HOME/mod/modules/" \;
 
-          FW_URL=$(echo "aHR0cHM6Ly9naXQua2VybmVsLm9yZy9wdWIvc2NtL2xpbnV4L2tlcm5lbC9naXQvZmlybXdhcmUvbGludXgtZmlybXdhcmUuZ2l0L3BsYWluL3J0Mjg3MC5iaW4=" | base64 -d)
-          wget -qO "$HOME/mod/system/vendor/firmware/rt2870.bin" "$FW_URL"
-
-          cat <<'EOF' > "$HOME/mod/module.prop"
-id=rt5370
-name=RT5370 WiFi CFI
-version=3.1
-versionCode=22
-author=GKI
-description=CFI-compatible RT2800USB stack for RT5370 using /vendor_dlkm cfg80211/mac80211
-EOF
-
-          INSTALLER_URL=$(echo "aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL3RvcGpvaG53dS9NYWdpc2svbWFzdGVyL3NjcmlwdHMvbW9kdWxlX2luc3RhbGxlci5zaA==" | base64 -d)
-          wget -qO "$HOME/mod/META-INF/com/google/android/update-binary" "$INSTALLER_URL"
-          printf '#MAGISK\n' > "$HOME/mod/META-INF/com/google/android/updater-script"
-
-          cd "$HOME/mod"
-          zip -r "$GITHUB_WORKSPACE/RT5370-KSU.zip" .
-
-      - name: Upload KSU module artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: RT5370-KSU
-          path: RT5370-KSU.zip
-          if-no-files-found: error
+          FW_URL=$(echo "aHR0cHM6Ly9naXQua2VybmVsLm9yZy9wdWIvc2NtL2xpbnV4L2tlcm5lb
