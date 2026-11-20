@@ -17,10 +17,9 @@ jobs:
           ./scripts/config --disable LOCALVERSION_AUTO
           ./scripts/config -e NETDEVICES -e WLAN -e WLAN_VENDOR_RALINK -e USB_SUPPORT -e USB -e CRC_CCITT -e CRYPTO_ARC4 -e CRYPTO_LIB_ARC4
           ./scripts/config -m CFG80211 -m MAC80211 -m RT2X00 -m RT2X00_LIB -m RT2X00_LIB_USB -m RT2800_LIB -m RT2800USB -e RT2800USB_RT53XX
-          ./scripts/config --disable NEW_LEDS --disable LEDS_CLASS --disable RT2X00_LIB_LEDS
-          make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig
-          grep -E "RT2X00|RT2800" .config
-          make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 modules_prepare
+          ./scripts/config --disable RT2X00_LIB_LEDS
+          printf '\nvoid led_classdev_suspend(void *cdev) {}\nvoid led_classdev_resume(void *cdev) {}\n' >> drivers/net/wireless/ralink/rt2x00/rt2x00dev.c
+          make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig modules_prepare
           SYM_URL=$(echo "aHR0cHM6Ly9jaS5hbmRyb2lkLmNvbS9idWlsZHMvc3VibWl0dGVkLzE1NTExNjc0L2tlcm5lbF9hYXJjaDY0L2xhdGVzdC9yYXcvTW9kdWxlLnN5bXZlcnM=" | base64 -d)
           wget -qO Module.symvers "$SYM_URL" || touch Module.symvers
           make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 KBUILD_MODPOST_WARN=1 M=net/wireless
@@ -30,7 +29,7 @@ jobs:
           find . -name "*.ko" -exec cp {} ~/mod/modules/ \;
           FW_URL=$(echo "aHR0cHM6Ly9naXQua2VybmVsLm9yZy9wdWIvc2NtL2xpbnV4L2tlcm5lbC9naXQvZmlybXdhcmUvbGludXgtZmlybXdhcmUuZ2l0L3BsYWluL3J0Mjg3MC5iaW4=" | base64 -d)
           wget -qO ~/mod/system/vendor/firmware/rt2870.bin "$FW_URL"
-          printf "id=rt5370\nname=RT5370 WiFi\nversion=1.6\nversionCode=7\nauthor=GKI\ndescription=RT5370 driver\n" > ~/mod/module.prop
+          printf "id=rt5370\nname=RT5370 WiFi\nversion=1.7\nversionCode=8\nauthor=GKI\ndescription=RT5370 driver\n" > ~/mod/module.prop
           printf "#!/system/bin/sh\nMODDIR=\${0%%/*}\nfor m in cfg80211 mac80211 rt2x00lib rt2x00usb rt2800lib rt2800usb; do insmod \$MODDIR/modules/\$m.ko; done\n" > ~/mod/service.sh
           chmod 755 ~/mod/service.sh
           UP_URL=$(echo "aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL3RvcGpvaG53dS9NYWdpc2svbWFzdGVyL3NjcmlwdHMvbW9kdWxlX2luc3RhbGxlci5zaA==" | base64 -d)
