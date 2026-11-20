@@ -9,17 +9,21 @@ jobs:
           sudo apt-get update && sudo apt-get install -y bc bison build-essential ccache clang curl flex git lld llvm libssl-dev libelf-dev python3 unzip wget zstd
           mkdir -p ~/work && cd ~/work
           K_URL=$(echo "aHR0cHM6Ly9hbmRyb2lkLmdvb2dsZXNvdXJjZS5jb20va2VybmVsL2NvbW1vbg==" | base64 -d)
-          git clone --depth=1 -b android15-6.6 "$K_URL" kernel
-          cd kernel
+          git init kernel && cd kernel
+          git remote add origin "$K_URL"
+          git fetch --depth=1 origin e56cf6b09cca || git fetch --depth=1 origin android15-6.6
+          git checkout FETCH_HEAD
           sed -i 's/^SUBLEVEL = .*/SUBLEVEL = 118/' Makefile
           cp $GITHUB_WORKSPACE/defconfig.txt .config
           ./scripts/config --set-str LOCALVERSION "-android15-8-ge56cf6b09cca-ab1551674-4k"
           ./scripts/config --disable LOCALVERSION_AUTO
           ./scripts/config -e NETDEVICES -e WLAN -e WLAN_VENDOR_RALINK -e USB_SUPPORT -e USB -e CRC_CCITT -e CRYPTO_ARC4 -e CRYPTO_LIB_ARC4
           ./scripts/config -m CFG80211 -m MAC80211 -m RT2X00 -m RT2X00_LIB -m RT2X00_LIB_USB -m RT2800_LIB -m RT2800USB -e RT2800USB_RT53XX
-          sed -i 's/led_classdev_suspend(/\/\/led_classdev_suspend(/g' drivers/net/wireless/ralink/rt2x00/*.c
-          sed -i 's/led_classdev_resume(/\/\/led_classdev_resume(/g' drivers/net/wireless/ralink/rt2x00/*.c
+          sed -i '/config RT2X00_LIB_LEDS/,/bool/ s/default y/default n/' drivers/net/wireless/ralink/rt2x00/Kconfig
+          sed -i '/select NEW_LEDS/d; /select LEDS_CLASS/d' drivers/net/wireless/ralink/rt2x00/Kconfig
+          ./scripts/config --disable RT2X00_LIB_LEDS
           make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig modules_prepare
+          grep "RT2X00_LIB_LEDS" .config || true
           SYM_URL=$(echo "aHR0cHM6Ly9jaS5hbmRyb2lkLmNvbS9idWlsZHMvc3VibWl0dGVkLzE1NTExNjc0L2tlcm5lbF9hYXJjaDY0L2xhdGVzdC9yYXcvTW9kdWxlLnN5bXZlcnM=" | base64 -d)
           wget -qO Module.symvers "$SYM_URL" || touch Module.symvers
           make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 KBUILD_MODPOST_WARN=1 M=drivers/net/wireless/ralink/rt2x00
@@ -27,7 +31,7 @@ jobs:
           find drivers/net/wireless/ralink/rt2x00 -name "*.ko" -exec cp {} ~/mod/modules/ \;
           FW_URL=$(echo "aHR0cHM6Ly9naXQua2VybmVsLm9yZy9wdWIvc2NtL2xpbnV4L2tlcm5lbC9naXQvZmlybXdhcmUvbGludXgtZmlybXdhcmUuZ2l0L3BsYWluL3J0Mjg3MC5iaW4=" | base64 -d)
           wget -qO ~/mod/system/vendor/firmware/rt2870.bin "$FW_URL"
-          printf "id=rt5370\nname=RT5370 WiFi Safe\nversion=2.0\nversionCode=11\nauthor=GKI\ndescription=Safe RT5370 modules with vendor firmware\n" > ~/mod/module.prop
+          printf "id=rt5370\nname=RT5370 WiFi Safe\nversion=2.1\nversionCode=12\nauthor=GKI\ndescription=Exact commit e56cf6b09cca RT5370 modules\n" > ~/mod/module.prop
           UP_URL=$(echo "aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL3RvcGpvaG53dS9NYWdpc2svbWFzdGVyL3NjcmlwdHMvbW9kdWxlX2luc3RhbGxlci5zaA==" | base64 -d)
           wget -qO ~/mod/META-INF/com/google/android/update-binary "$UP_URL"
           echo "#MAGISK" > ~/mod/META-INF/com/google/android/updater-script
