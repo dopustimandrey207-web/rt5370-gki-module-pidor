@@ -18,7 +18,7 @@ jobs:
           ./scripts/config -e NETDEVICES -e WLAN -e WLAN_VENDOR_RALINK -e USB_SUPPORT -e USB -e CRC_CCITT -e CRYPTO_ARC4 -e CRYPTO_LIB_ARC4
           ./scripts/config -m CFG80211 -m MAC80211 -m RT2X00 -m RT2X00_LIB -m RT2X00_LIB_USB -m RT2800_LIB -m RT2800USB -e RT2800USB_RT53XX
           ./scripts/config --disable RT2X00_LIB_LEDS
-          printf '\nvoid led_classdev_suspend(void *cdev) {}\nvoid led_classdev_resume(void *cdev) {}\n' >> drivers/net/wireless/ralink/rt2x00/rt2x00dev.c
+          printf '\nvoid led_classdev_suspend(struct led_classdev *led_cdev) {}\nvoid led_classdev_resume(struct led_classdev *led_cdev) {}\n' >> drivers/net/wireless/ralink/rt2x00/rt2x00dev.c
           make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig modules_prepare
           SYM_URL=$(echo "aHR0cHM6Ly9jaS5hbmRyb2lkLmNvbS9idWlsZHMvc3VibWl0dGVkLzE1NTExNjc0L2tlcm5lbF9hYXJjaDY0L2xhdGVzdC9yYXcvTW9kdWxlLnN5bXZlcnM=" | base64 -d)
           wget -qO Module.symvers "$SYM_URL" || touch Module.symvers
