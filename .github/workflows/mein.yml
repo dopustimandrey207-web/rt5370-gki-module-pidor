@@ -6,17 +6,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: |
-          sudo apt-get update && sudo apt-get install -y bc bison build-essential ccache curl flex git libssl-dev libelf-dev python3 unzip wget zstd
-          mkdir -p ~/work/clang && cd ~/work
-          git clone --depth=1 https://googlesource.com -b android15-6.6 kernel
-          wget -qO- https://googlesource.com | tar -xz -C clang
+          sudo apt-get update && sudo apt-get install -y bc bison build-essential ccache clang curl flex git lld llvm libssl-dev libelf-dev python3 unzip wget zstd
+          mkdir -p ~/work && cd ~/work
+          git clone --depth=1 -b android15-6.6 https://googlesource.com kernel
           cd kernel
           cp $GITHUB_WORKSPACE/defconfig.txt .config
           ./scripts/config --set-str LOCALVERSION "-android15-8-ge56cf6b09cca-ab1551674-4k"
           ./scripts/config --disable LOCALVERSION_AUTO
           ./scripts/config --disable MODVERSIONS
           ./scripts/config -m CFG80211 -m MAC80211 -m RT2X00 -m RT2X00_LIB -m RT2X00_LIB_USB -m RT2800_LIB -m RT2800USB -e RT2800USB_RT53XX
-          export PATH="$HOME/work/clang/bin:$PATH"
           make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig modules_prepare
           make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 M=net/wireless
           make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 M=net/mac80211
@@ -34,4 +32,3 @@ jobs:
         with:
           name: RT5370-KSU
           path: RT5370-KSU.zip
-          
