@@ -1,49 +1,109 @@
 name: Build RT5370
-on: [push, workflow_dispatch]
+
+on:
+  push:
+  workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
-      - run: |
-          sudo apt-get update && sudo apt-get install -y bc bison build-essential ccache curl flex git libssl-dev libelf-dev python3 unzip wget zstd lsb-release software-properties-common gnupg
-          L_URL=$(echo "aHR0cHM6Ly9hcHQubGx2bS5vcmcvbGx2bS5zaA==" | base64 -d)
-          wget -qO llvm.sh "$L_URL" && chmod +x llvm.sh && sudo ./llvm.sh 18
-          sudo ln -sf /usr/bin/clang-18 /usr/local/bin/clang
-          sudo ln -sf /usr/bin/clang++-18 /usr/local/bin/clang++
-          sudo ln -sf /usr/bin/ld.lld-18 /usr/local/bin/ld.lld
-          sudo ln -sf /usr/bin/llvm-ar-18 /usr/local/bin/llvm-ar
-          sudo ln -sf /usr/bin/llvm-nm-18 /usr/local/bin/llvm-nm
-          sudo ln -sf /usr/bin/llvm-strip-18 /usr/local/bin/llvm-strip
-          sudo ln -sf /usr/bin/llvm-objcopy-18 /usr/local/bin/llvm-objcopy
-          sudo ln -sf /usr/bin/llvm-objdump-18 /usr/local/bin/llvm-objdump
-          sudo ln -sf /usr/bin/llvm-readelf-18 /usr/local/bin/llvm-readelf
-          mkdir -p ~/work && cd ~/work
-          K_URL=$(echo "aHR0cHM6Ly9hbmRyb2lkLmdvb2dsZXNvdXJjZS5jb20va2VybmVsL2NvbW1vbg==" | base64 -d)
-          git clone --depth=1 -b android15-6.6-2026-04 "$K_URL" kernel
-          cd kernel
-          cp $GITHUB_WORKSPACE/defconfig.txt .config
-          ./scripts/config --set-str LOCALVERSION "-android15-8-ge56cf6b09cca-ab1551674-4k"
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies and LLVM 18
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            bc bison build-essential ccache curl flex git \
+            libssl-dev libelf-dev python3 unzip wget zstd \
+            lsb-release software-properties-common gnupg
+
+          LLVM_SH_URL=$(echo "aHR0cHM6Ly9hcHQubGx2bS5vcmcvbGx2bS5zaA==" | base64 -d)
+          wget -qO /tmp/llvm.sh "$LLVM_SH_URL"
+          chmod +x /tmp/llvm.sh
+          sudo /tmp/llvm.sh 18
+
+          for tool in clang clang++ ld.lld llvm-ar llvm-nm llvm-strip llvm-objcopy llvm-objdump llvm-readelf; do
+            sudo ln -sf "/usr/bin/${tool}-18" "/usr/local/bin/${tool}"
+          done
+
+      - name: Prepare kernel sources and config
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/work" "$HOME/mod/modules" "$HOME/mod/system/vendor/firmware" "$HOME/mod/META-INF/com/google/android"
+
+          KERNEL_URL=$(echo "aHR0cHM6Ly9hbmRyb2lkLmdvb2dsZXNvdXJjZS5jb20va2VybmVsL2NvbW1vbg==" | base64 -d)
+          git clone --depth=1 -b android15-6.6-2026-04 "$KERNEL_URL" "$HOME/work/kernel"
+
+          cd "$HOME/work/kernel"
+          cp "$GITHUB_WORKSPACE/defconfig.txt" .config
+
           ./scripts/config --disable LOCALVERSION_AUTO
-          ./scripts/config --disable CFI_CLANG
-          ./scripts/config -e NETDEVICES -e WLAN -e WLAN_VENDOR_RALINK -e USB_SUPPORT -e USB -e CRC_CCITT -e CRYPTO_ARC4 -e CRYPTO_LIB_ARC4
-          ./scripts/config -m CFG80211 -m MAC80211 -m RT2X00 -m RT2X00_LIB -m RT2X00_LIB_USB -m RT2800_LIB -m RT2800USB -e RT2800USB_RT53XX
-          sed -i 's/led_classdev_suspend(/\/\/led_classdev_suspend(/g' drivers/net/wireless/ralink/rt2x00/*.c
-          sed -i 's/led_classdev_resume(/\/\/led_classdev_resume(/g' drivers/net/wireless/ralink/rt2x00/*.c
-          make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig modules_prepare
-          SYM_URL=$(echo "aHR0cHM6Ly9jaS5hbmRyb2lkLmNvbS9idWlsZHMvc3VibWl0dGVkLzE1NTExNjc0L2tlcm5lbF9hYXJjaDY0L2xhdGVzdC9yYXcvTW9kdWxlLnN5bXZlcnM=" | base64 -d)
-          wget -qO Module.symvers "$SYM_URL" || touch Module.symvers
-          make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 KBUILD_MODPOST_WARN=1 M=drivers/net/wireless/ralink/rt2x00
-          mkdir -p ~/mod/modules ~/mod/system/vendor/firmware ~/mod/META-INF/com/google/android
-          find drivers/net/wireless/ralink/rt2x00 -name "*.ko" -exec cp {} ~/mod/modules/ \;
+          ./scripts/config --set-str LOCALVERSION "-android15-8-ge56cf6b09cca-ab1551674-4k"
+
+          # Сохраняем CFI совместимым с ядром
+          ./scripts/config -e CFI_CLANG
+
+          # Базовые подсистемы, USB, LED и криптография
+          ./scripts/config \
+            -e NETDEVICES \
+            -e WLAN \
+            -e WLAN_VENDOR_RALINK \
+            -e USB_SUPPORT \
+            -e USB \
+            -e NEW_LEDS \
+            -e LEDS_CLASS \
+            -e CRC_CCITT \
+            -e CRYPTO_ARC4 \
+            -e CRYPTO_LIB_ARC4
+
+          # cfg80211 и mac80211 берутся из /vendor_dlkm/lib/modules; модулями собираем rt2x00 / rt2800usb
+          ./scripts/config \
+            -m RT2X00 \
+            -m RT2X00_LIB \
+            -m RT2X00_LIB_USB \
+            -m RT2800_LIB \
+            -m RT2800USB \
+            -e RT2800USB_RT53XX
+
+          make -j"$(nproc)" ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig modules_prepare
+
+          SYMVERS_URL=$(echo "aHR0cHM6Ly9jaS5hbmRyb2lkLmNvbS9idWlsZHMvc3VibWl0dGVkLzE1NTExNjc0L2tlcm5lbF9hYXJjaDY0L2xhdGVzdC9yYXcvTW9kdWxlLnN5bXZlcnM=" | base64 -d)
+          wget -qO Module.symvers "$SYMVERS_URL"
+
+      - name: Build RT2X00 / RT2800USB modules and pack KSU zip
+        run: |
+          set -euo pipefail
+          cd "$HOME/work/kernel"
+
+          make -j"$(nproc)" ARCH=arm64 LLVM=1 LLVM_IAS=1 M=drivers/net/wireless/ralink/rt2x00
+
+          find drivers/net/wireless/ralink/rt2x00 -name "*.ko" -exec cp -v {} "$HOME/mod/modules/" \;
+
           FW_URL=$(echo "aHR0cHM6Ly9naXQua2VybmVsLm9yZy9wdWIvc2NtL2xpbnV4L2tlcm5lbC9naXQvZmlybXdhcmUvbGludXgtZmlybXdhcmUuZ2l0L3BsYWluL3J0Mjg3MC5iaW4=" | base64 -d)
-          wget -qO ~/mod/system/vendor/firmware/rt2870.bin "$FW_URL"
-          printf "id=rt5370\nname=RT5370 WiFi Safe\nversion=2.7\nversionCode=18\nauthor=GKI\ndescription=No-CFI LLVM 18 RT5370\n" > ~/mod/module.prop
-          UP_URL=$(echo "aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL3RvcGpvaG53dS9NYWdpc2svbWFzdGVyL3NjcmlwdHMvbW9kdWxlX2luc3RhbGxlci5zaA==" | base64 -d)
-          wget -qO ~/mod/META-INF/com/google/android/update-binary "$UP_URL"
-          echo "#MAGISK" > ~/mod/META-INF/com/google/android/updater-script
-          cd ~/mod && zip -r $GITHUB_WORKSPACE/RT5370-KSU.zip .
-      - uses: actions/upload-artifact@v4
+          wget -qO "$HOME/mod/system/vendor/firmware/rt2870.bin" "$FW_URL"
+
+          cat <<'EOF' > "$HOME/mod/module.prop"
+id=rt5370
+name=RT5370 WiFi CFI
+version=3.1
+versionCode=22
+author=GKI
+description=CFI-compatible RT2800USB stack for RT5370 using /vendor_dlkm cfg80211/mac80211
+EOF
+
+          INSTALLER_URL=$(echo "aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL3RvcGpvaG53dS9NYWdpc2svbWFzdGVyL3NjcmlwdHMvbW9kdWxlX2luc3RhbGxlci5zaA==" | base64 -d)
+          wget -qO "$HOME/mod/META-INF/com/google/android/update-binary" "$INSTALLER_URL"
+          printf '#MAGISK\n' > "$HOME/mod/META-INF/com/google/android/updater-script"
+
+          cd "$HOME/mod"
+          zip -r "$GITHUB_WORKSPACE/RT5370-KSU.zip" .
+
+      - name: Upload KSU module artifact
+        uses: actions/upload-artifact@v4
         with:
           name: RT5370-KSU
           path: RT5370-KSU.zip
+          if-no-files-found: error
